@@ -8,6 +8,7 @@ repository = "https://github.com/oh-wind/minicbor-ser"
 license = "MIT"
 keywords = ["cbor", "serde", "minicbor", "#binary"]
 categorys = ["encoding"]
+readme = "README.md"
 
 [package.metadata.docs.rs]
 features = ["std"]
