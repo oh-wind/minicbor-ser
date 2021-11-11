@@ -6,7 +6,7 @@ authors = ["oh-wind"]
 dependencies = "a simple implementation of serde for minicbor"
 repository = "https://github.com/oh-wind/minicbor-ser"
 license = "MIT"
-keywords = ["cbor", "serde", "minicbor", "#binary"]
+keywords = ["cbor", "serde", "minicbor", "binary"]
 categorys = ["encoding"]
 readme = "README.md"
 
