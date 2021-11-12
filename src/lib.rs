@@ -2,10 +2,12 @@
 //!
 //! A simple implementation of [serde] for [minicbor]
 //!
+//! [serde]: https://serde.rs/
+//! [minicbor]: https://crates.io/crates/minicbor
+//! 
 //! * serialisation
 //!
 //! ```rust
-//! use minicbor_ser as cbor;
 //! use serde::Serialize;
 //! fn main(){
 //!     #[derive(Debug, Serialize)]
@@ -17,7 +19,7 @@
 //!             hello: "world".to_string(),
 //!     };
 //!
-//!     let value = cbor::to_vec(&test_struct).unwrap();
+//!     let value = to_vec(&test_struct).unwrap();
 //!     assert_eq!(
 //!         [0xA1u8, 0x65, 0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x65, 0x77, 0x6F, 0x72, 0x6C, 0x64],
 //!         value.as_slice(),
@@ -26,8 +28,8 @@
 //! ```
 //!
 //! * Deserialization
+//! 
 //! ```rust
-//! use minicbor_ser as cbor;
 //! use serde::Deserialize;
 //! fn main(){
 //!     #[derive(Debug, Deserialize, PartialEq)]
@@ -37,7 +39,7 @@
 //!
 //!     let data = [0xA1u8, 0x65, 0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x65, 0x77, 0x6F, 0x72, 0x6C, 0x64];
 //!
-//!     let value: TestStruct = cbor::from_slice(&data[..]).unwrap();
+//!     let value: TestStruct = from_slice(&data[..]).unwrap();
 //!
 //!     assert_eq!(
 //!         TestStruct {

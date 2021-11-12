@@ -6,7 +6,12 @@ This repository provides a simple implementation of [serde] for [minicbor], maki
 
 Just like using other serde derived libraries:
 
-* serialisation
+```toml
+[dependencies]
+minicbor-ser = "0.1.1"
+```
+
+* Serialization
 
 ```rust
 use minicbor_ser as cbor;
@@ -55,8 +60,8 @@ fn main(){
 # Type mapping table
 
 The following represents how the minicbor-ser will map the types of Rust and CBOR
-- ❌ : Not support
-- ⚠  : Not perfect yet
+- ❌    : Not support
+- ⚠    : Not perfect yet
 
 |       Rust       |       CBOR       |
 | :--------------: | :--------------: |
@@ -71,6 +76,7 @@ The following represents how the minicbor-ser will map the types of Rust and CBO
 |      slice       |      array       |
 |      &[u8]       |      bytes       |
 |      tuple       |      array       |
+|       Vec        |      array       |
 | newtype variant  |       map        |
 |   unit variant   |      String      |
 |  tuple variant   |      array       |
@@ -79,7 +85,13 @@ The following represents how the minicbor-ser will map the types of Rust and CBO
 
 
 # no-std
-The current `no-std` feature of minicbor-ser requires `alloc`. If your machine cannot use `alloc`, it is recommended that you use the `derive` feature that comes with `minicbor`.
+The current `no-std` feature of minicbor-ser requires `alloc`. If your machine cannot use `alloc`, it is recommended that you use the `derive` feature that comes with `minicbor`.  
+To enable `no-std`, use :
+
+```toml
+[dependencies]
+minicbor-ser = { version = "0.1.1", default-features = false }
+```
 
 
 

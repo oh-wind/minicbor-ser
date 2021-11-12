@@ -1,9 +1,9 @@
 [package]
 name = "minicbor-ser"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2018"
 authors = ["oh-wind"]
-description = "a simple implementation of serde for minicbor"
+description = "A simple implementation of serde for minicbor"
 repository = "https://github.com/oh-wind/minicbor-ser"
 license = "MIT"
 keywords = ["cbor", "serde", "minicbor", "binary"]
@@ -17,7 +17,7 @@ features = ["std"]
 serde = {version = "1.0.*", default-features = false}
 
 [dependencies.minicbor]
-version = "0.11.*"
+version = "~0.11"
 features = ["alloc"]
 
 [dev-dependencies]
