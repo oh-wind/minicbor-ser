@@ -8,7 +8,7 @@ Just like using other serde derived libraries:
 
 ```toml
 [dependencies]
-minicbor-ser = "0.1.1"
+minicbor-ser = "0.1.*"
 ```
 
 * Serialization
@@ -90,7 +90,7 @@ To enable `no-std`, use :
 
 ```toml
 [dependencies]
-minicbor-ser = { version = "0.1.1", default-features = false }
+minicbor-ser = { version = "0.1.*", default-features = false }
 ```
 
 

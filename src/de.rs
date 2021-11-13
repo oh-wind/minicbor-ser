@@ -296,10 +296,11 @@ impl <'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 
                 let len = self.decoder.map()?;
                 if len == Some(1) || len == None {
+                    let value =  visitor.visit_enum(EnumVariantAccess::new(self))?;
                     if len == None && Type::Break != self.decoder.datatype()?{
                         return Err(type_mismatch(Type::Break, "expected map with 1 element, but break code(0xff) was not found"));
                     }
-                    return visitor.visit_enum(EnumVariantAccess::new(self))
+                    return Ok(value);
                 }else{
                     return Err(type_mismatch(Type::Map, "expected map with 1 element"))
                }
@@ -607,6 +608,10 @@ pub mod de_test{
         let data = [0xa4, 0x61, 0x62, 0x02, 0x61, 0x61, 0x01, 0x61, 0x64, 0x04, 0x61, 0x63, 0x03];
         let value: TestStruct = from_slice(&data).unwrap();
         assert_eq!(expect, value);
+
+        let data = [0xBF,0x61, 0x62, 0x02, 0x61, 0x61, 0x01, 0x61, 0x64, 0x04, 0x61, 0x63, 0x03, 0xFF];
+        let value: TestStruct = from_slice(&data).unwrap();
+        assert_eq!(expect, value);
     }
 
     macro_rules! test_enum {
@@ -635,6 +640,9 @@ pub mod de_test{
         test_enum!{ [0xA1, 0x61, 0x42, 0x18, 0xff], TestEnum::B(0xff);}
         test_enum!{ [0xA1, 0x61, 0x43, 0xa4, 0x61, 0x62, 0x02, 0x61, 0x61, 0x01, 0x61, 0x64, 0x04, 0x61, 0x63, 0x03], 
                TestEnum::C(TestStruct{a: 1, b: 2, c: 3, d: 4});}
+        test_enum!{ [0xBF, 0x61, 0x43, 0xa4, 0x61, 0x62, 0x02, 0x61, 0x61, 0x01, 0x61, 0x64, 0x04, 0x61, 0x63, 0x03, 0xFF],
+                TestEnum::C(TestStruct{a: 1, b: 2, c: 3, d: 4});}
         test_enum!{     [0xA1, 0x61, 0x44, 0x82, 0x01, 0x02 ], TestEnum::D((1, 2));}
+        
     }
 }
