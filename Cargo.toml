@@ -1,6 +1,6 @@
 [package]
 name = "minicbor-ser"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2018"
 authors = ["oh-wind"]
 description = "A simple implementation of serde for minicbor"
