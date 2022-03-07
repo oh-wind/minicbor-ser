@@ -25,7 +25,7 @@ impl<'de> Deserializer<'de> {
     where
         V: de::Visitor<'de>,
     {
-        todo!()
+        Err(type_mismatch(Type::Tag, "this type is not currently supported."))
     }
 }
 
