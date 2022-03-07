@@ -93,6 +93,10 @@ To enable `no-std`, use :
 minicbor-ser = { version = "0.1.*", default-features = false }
 ```
 
+# Note
+Some types of serialization and deserialization may be different from `minicbor`, depending on how `minicbor` is implemented.
+If you need the default implementation of `minicbor`, please use `minicbor_ser::cbor` to access its API.
+
 
 
 [serde]: https://serde.rs/

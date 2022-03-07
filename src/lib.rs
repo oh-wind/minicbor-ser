@@ -1,10 +1,10 @@
-#![cfg_attr(not(feature = "std") , no_std)]
+#![cfg_attr(not(feature = "std"), no_std)]
 //!
 //! A simple implementation of [serde] for [minicbor]
 //!
 //! [serde]: https://serde.rs/
 //! [minicbor]: https://crates.io/crates/minicbor
-//! 
+//!
 //! * serialisation
 //!
 //! ```rust
@@ -28,7 +28,7 @@
 //! ```
 //!
 //! * Deserialization
-//! 
+//!
 //! ```rust
 //! use serde::Deserialize;
 //! fn main(){
@@ -59,13 +59,12 @@ pub mod error;
 pub mod ser;
 pub use minicbor as cbor;
 
-
-mod lib{
-    mod core{
-        #[cfg(feature = "std")]
-        pub use std::*;
+mod lib {
+    mod core {
         #[cfg(not(feature = "std"))]
         pub use core::*;
+        #[cfg(feature = "std")]
+        pub use std::*;
     }
 
     pub use self::core::cell::{Cell, RefCell};
@@ -79,7 +78,6 @@ mod lib{
     pub use self::core::ops::{Bound, RangeBounds};
     pub use self::core::result::{self, Result};
     pub use self::core::{borrow, char, cmp, iter, mem, num, ops, slice, str};
-
 
     #[cfg(not(feature = "std"))]
     pub use alloc::string::{String, ToString};
@@ -102,14 +100,12 @@ mod lib{
     pub use std::collections::{btree_map, BTreeMap};
 }
 
-
-
 pub use de::from_slice;
 pub use ser::to_vec;
 pub use ser::to_writer;
 
 #[test]
-fn test_ser(){
+fn test_ser() {
     use serde::Serialize;
     #[derive(Debug, Serialize)]
     struct TestStruct {
@@ -117,7 +113,7 @@ fn test_ser(){
     }
 
     let test_struct = TestStruct {
-            hello: "world".to_string(),
+        hello: "world".to_string(),
     };
 
     let value = to_vec(&test_struct).unwrap();
@@ -128,17 +124,19 @@ fn test_ser(){
 }
 
 #[test]
-fn test_de(){
+fn test_de() {
     use serde::Deserialize;
     #[derive(Debug, Deserialize, PartialEq)]
     struct TestStruct {
         hello: String,
     }
 
-    let data = [0xA1u8, 0x65, 0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x65, 0x77, 0x6F, 0x72, 0x6C, 0x64];
-    
+    let data = [
+        0xA1u8, 0x65, 0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x65, 0x77, 0x6F, 0x72, 0x6C, 0x64,
+    ];
+
     let value: TestStruct = from_slice(&data[..]).unwrap();
-    
+
     assert_eq!(
         TestStruct {
             hello: "world".to_string(),

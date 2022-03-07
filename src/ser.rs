@@ -2,14 +2,25 @@
 use crate::error::{Error, ErrorKind};
 use crate::lib::*;
 use core::fmt::Display;
-use minicbor::{encode::Write,  Encoder};
-use serde::{self, ser};
+use minicbor::{encode::Write, Encoder};
 use serde::serde_if_integer128;
+use serde::{self, ser};
+
+#[derive(Debug, Clone, Copy)]
+pub struct Config {
+    top_flatten: bool,
+}
+impl Default for Config {
+    fn default() -> Self {
+        Self { top_flatten: false }
+    }
+}
 
 pub struct Serializer<W> {
     pub(crate) encoder: Encoder<W>,
+    depth: u32,
+    flatten_top: bool,
 }
-
 
 impl<T> Serializer<T>
 where
@@ -18,9 +29,18 @@ where
     pub fn new(w: T) -> Self {
         Serializer {
             encoder: Encoder::new(w),
+            depth: 0,
+            flatten_top: false,
         }
     }
-    pub fn encoder(&mut self) -> &mut Encoder<T>{
+    pub fn new_with_config(w: T, cfg: Config) -> Self {
+        Serializer {
+            encoder: Encoder::new(w),
+            depth: 0,
+            flatten_top: cfg.top_flatten,
+        }
+    }
+    pub fn encoder(&mut self) -> &mut Encoder<T> {
         &mut self.encoder
     }
 }
@@ -188,6 +208,12 @@ where
 
     #[inline]
     fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
+        if self.depth == 0 && self.flatten_top {
+            return Ok(Compound::Map {
+                ser: self,
+                state: State::FlattenFirst,
+            });
+        }
         match len {
             Some(le) => {
                 if le == 0 {
@@ -200,7 +226,7 @@ where
                     self.encoder.array(le as u64)?;
                     Ok(Compound::Map {
                         ser: self,
-                        state: State::SizedFirst(le),
+                        state: State::First(Some(le)),
                     })
                 }
             }
@@ -208,7 +234,7 @@ where
                 self.encoder.begin_array()?;
                 Ok(Compound::Map {
                     ser: self,
-                    state: State::UnsizedFirst,
+                    state: State::First(None),
                 })
             }
         }
@@ -242,6 +268,12 @@ where
 
     #[inline]
     fn serialize_map(self, len: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
+        if self.flatten_top && self.depth == 0 {
+            return Ok(Compound::Map {
+                ser: self,
+                state: State::FlattenFirst,
+            });
+        }
         match len {
             Some(le) => {
                 if le == 0 {
@@ -254,7 +286,7 @@ where
                     self.encoder.map(le as u64)?;
                     Ok(Compound::Map {
                         ser: self,
-                        state: State::SizedFirst(le),
+                        state: State::First(Some(le)),
                     })
                 }
             }
@@ -262,7 +294,7 @@ where
                 self.encoder.begin_map()?;
                 Ok(Compound::Map {
                     ser: self,
-                    state: State::UnsizedFirst,
+                    state: State::First(None),
                 })
             }
         }
@@ -285,10 +317,16 @@ where
         variant: &'static str,
         len: usize,
     ) -> Result<Self::SerializeStructVariant, Self::Error> {
+        if self.flatten_top && self.depth == 0 {
+            return Ok(Compound::Map {
+                ser: self,
+                state: State::FlattenFirst,
+            });
+        }
         self.encoder.map(1)?.str(variant)?;
         Ok(Compound::Map {
             ser: self,
-            state: State::SizedFirst(len),
+            state: State::First(Some(len)),
         })
     }
 
@@ -300,7 +338,6 @@ where
         // Temporary:
         self.serialize_str(&value.to_string())
     }
-
 
     serde_if_integer128! {
         #[inline]
@@ -320,11 +357,11 @@ where
 #[derive(PartialEq, Eq)]
 /// Not public API.
 pub enum State {
-    SizedFirst(usize),
-    UnsizedFirst,
+    First(Option<usize>),
     Empty,
-    SizedRest,
-    UnsizedRest,
+    Rest(Option<usize>),
+    FlattenFirst,
+    FlattenRest,
 }
 
 #[doc(hidden)]
@@ -354,11 +391,13 @@ where
                 ref mut state,
             } => {
                 match *state {
-                    State::SizedFirst(_) => {
-                        *state = State::SizedRest;
+                    State::First(size) => {
+                        ser.depth += 1;
+                        *state = State::Rest(size);
                     }
-                    State::UnsizedFirst => {
-                        *state = State::UnsizedRest;
+                    State::FlattenFirst => {
+                        ser.depth += 1;
+                        *state = State::FlattenRest;
                     }
                     _ => {}
                 }
@@ -372,9 +411,14 @@ where
         match self {
             Compound::Map { ser, state } => {
                 match state {
-                    State::Empty => {}
-                    State::UnsizedRest => {
-                        ser.encoder.end()?;
+                    State::Rest(size) => {
+                        if size.is_none() {
+                            ser.encoder.end()?;
+                        }
+                        ser.depth -= 1;
+                    }
+                    State::FlattenRest => {
+                        ser.depth -= 1;
                     }
                     _ => {}
                 }
@@ -468,18 +512,7 @@ where
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        match self {
-            Compound::Map { ser, state } => {
-                match state {
-                    State::Empty => {}
-                    State::UnsizedRest => {
-                        ser.encoder.end()?;
-                    }
-                    _ => {}
-                }
-                Ok(())
-            }
-        }
+        ser::SerializeSeq::end(self)
     }
 }
 
@@ -501,11 +534,13 @@ where
                 ref mut state,
             } => {
                 match *state {
-                    State::SizedFirst(_) => {
-                        *state = State::SizedRest;
+                    State::First(size) => {
+                        ser.depth += 1;
+                        *state = State::Rest(size);
                     }
-                    State::UnsizedFirst => {
-                        *state = State::UnsizedRest;
+                    State::FlattenFirst => {
+                        ser.depth += 1;
+                        *state = State::FlattenFirst;
                     }
                     _ => {}
                 }
@@ -536,9 +571,14 @@ where
         match self {
             Compound::Map { ser, state } => {
                 match state {
-                    State::Empty => {}
-                    State::UnsizedRest => {
-                        ser.encoder.end()?;
+                    State::Rest(size) => {
+                        if size.is_none() {
+                            ser.encoder.end()?;
+                        }
+                        ser.depth -= 1;
+                    }
+                    State::FlattenRest => {
+                        ser.depth -= 1;
                     }
                     _ => {}
                 }
@@ -570,28 +610,43 @@ where
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        match self {
-            Compound::Map { ser, state } => {
-                Ok(())
-            }
-        }
+        ser::SerializeStruct::end(self)
     }
 }
-
-
 
 #[inline]
 pub fn to_vec<T>(value: &T) -> Result<Vec<u8>, Error>
 where
-    T: ?Sized + ser::Serialize 
+    T: ?Sized + ser::Serialize,
 {
     let mut out = Vec::with_capacity(128);
     to_writer(value, &mut out)?;
     Ok(out)
 }
 
+pub fn to_vec_flatten<T>(value: &T, flt: bool) -> Result<Vec<u8>, Error>
+where
+    T: ?Sized + ser::Serialize,
+{
+    let mut out = Vec::with_capacity(128);
+    to_writer_cfg(value, &mut out, Config { top_flatten: flt })?;
+    Ok(out)
+}
+
 #[inline]
-pub fn to_writer<W, T>( value: &T, writer: W) -> Result<(),Error>
+pub fn to_writer_cfg<W, T>(value: &T, writer: W, cfg: Config) -> Result<(), Error>
+where
+    W: Write,
+    W::Error: Display,
+    T: ?Sized + ser::Serialize,
+{
+    let mut se = Serializer::new_with_config(writer, cfg);
+    value.serialize(&mut se)?;
+    Ok(())
+}
+
+#[inline]
+pub fn to_writer<W, T>(value: &T, writer: W) -> Result<(), Error>
 where
     W: Write,
     W::Error: Display,
@@ -603,15 +658,14 @@ where
 }
 
 #[inline]
-pub fn by_encoder<T: minicbor::Encode, W>(v: T, serializer:&mut Serializer<W>) -> Result<(), Error>
-where 
-    W:Write,
-    W::Error: Display 
+pub fn by_encoder<T: minicbor::Encode, W>(v: T, serializer: &mut Serializer<W>) -> Result<(), Error>
+where
+    W: Write,
+    W::Error: Display,
 {
     serializer.encoder().encode(v)?;
     Ok(())
 }
-
 
 #[cfg(test)]
 mod ser_tests {
@@ -619,28 +673,43 @@ mod ser_tests {
     use serde::Serialize;
 
     use super::*;
-    
+
     macro_rules! assert_result {
-        ($expect:expr, $data:expr $(,)?) => ({
-            let __s : Vec<u8> = to_vec(&$data).unwrap();
+        ($expect:expr, $data:expr , $flt:expr) => {{
+            let __s: Vec<u8> = to_vec_flatten(&$data, $flt).unwrap();
             let __s = __s.as_slice();
-            assert_eq!($expect, __s, "\n left hex: {:x?} \n right hex: {:x?}\n", $expect, __s);
-        });
+            assert_eq!(
+                $expect, __s,
+                "\n left hex: {:x?} \n right hex: {:x?}\n",
+                $expect, __s
+            );
+        }};
+        ($expect:expr, $data:expr $(,)?) => {{
+            assert_result!($expect, $data, false)
+        }};
     }
 
     #[test]
-    fn test_array(){
-        let expect = [0x88u8,0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x18,0x18, 0x18, 0xFF];
+    fn test_array() {
+        let expect = [
+            0x88u8, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x18, 0x18, 0x18, 0xFF,
+        ];
         let const_array = [0u8, 1, 2, 3, 4, 5, 0x18, 0xff];
         let vec_array = [0u8, 1, 2, 3, 4, 5, 0x18, 0xff].to_vec();
+        let exp_empty = [0x80]; //empty array
+        let empty_arr: [u8; 0] = [];
+
         assert_result!(expect, const_array);
         assert_result!(expect, vec_array);
+        assert_result!(exp_empty, empty_arr);
     }
 
     #[test]
-    fn test_map(){
+    fn test_map() {
         // {"hello": "world"}
-        let expect = [0xA1u8, 0x65, 0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x65, 0x77, 0x6F, 0x72, 0x6C, 0x64];
+        let expect = [
+            0xA1u8, 0x65, 0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x65, 0x77, 0x6F, 0x72, 0x6C, 0x64,
+        ];
         let mut map = BTreeMap::new();
         map.insert("hello".to_string(), "world".to_string());
         assert_result!(expect, map);
@@ -657,45 +726,68 @@ mod ser_tests {
     }
 
     #[derive(Debug, Serialize)]
-    struct TestStruct2{
-        a: [u8;2],
+    struct TestStruct2 {
+        a: [u8; 2],
         b: TestStruct,
     }
 
     #[test]
-    fn test_struct(){
-        let expect = [0xA1u8, 0x65, 0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x65, 0x77, 0x6F, 0x72, 0x6C, 0x64];
+    fn test_struct() {
+        let expect = [
+            0xA1u8, 0x65, 0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x65, 0x77, 0x6F, 0x72, 0x6C, 0x64,
+        ];
         let test_struct = TestStruct {
             hello: "world".to_string(),
         };
         assert_result!(expect, test_struct);
-        let expect = [0xA2, 0x61, 0x61, 0x82, 01, 02, 0x61, 0x62, 0xA1, 0x65, 0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x65, 0x77, 0x6F, 0x72, 0x6C, 0x64];
-        let test_struct2 = TestStruct2{
-            a: [1,2],
+        let expect = [
+            0xA2, 0x61, 0x61, 0x82, 01, 02, 0x61, 0x62, 0xA1, 0x65, 0x68, 0x65, 0x6C, 0x6C, 0x6F,
+            0x65, 0x77, 0x6F, 0x72, 0x6C, 0x64,
+        ];
+        let test_struct2 = TestStruct2 {
+            a: [1, 2],
             b: test_struct,
         };
         assert_result!(expect, test_struct2);
     }
 
     #[test]
-    fn test_tuple(){
-        let expect = [0x88u8,0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x18,0x18, 0x18, 0xFF];
+    fn test_tuple() {
+        let expect = [
+            0x88u8, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x18, 0x18, 0x18, 0xFF,
+        ];
         let tuple_array = (0u8, 1, 2, 3, 4, 5, 0x18, 0xff);
         assert_result!(expect, tuple_array);
+
+        let expect = [0x01u8, 0x18, 0xff, 0x65, 0x68, 0x65, 0x6c, 0x6c, 0x6f];
+        let tuple_flatten = (0x01u8, 0xffu8, "hello");
+        assert_result!(expect, tuple_flatten, true);
     }
 
-
     #[derive(Debug, Serialize)]
-    enum TestEnum {A,B(i32),C(TestStruct),D(&'static [u8])}
+    enum TestEnum {
+        A,
+        B(i32),
+        C(TestStruct),
+        D(&'static [u8]),
+    }
     #[test]
-    fn test_enum(){
+    fn test_enum() {
         let a = TestEnum::A;
         let b = TestEnum::B(1);
-        let c = TestEnum::C(TestStruct{hello: "world".to_string()});
-        let d = TestEnum::D(&[1,2,3,4][..]);
+        let c = TestEnum::C(TestStruct {
+            hello: "world".to_string(),
+        });
+        let d = TestEnum::D(&[1, 2, 3, 4][..]);
         assert_result!([0x61, 0x41], a);
         assert_result!([0xa1, 0x61, 0x42, 0x1], b);
-        assert_result!([0xa1, 0x61, 0x43, 0xa1, 0x65, 0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x65, 0x77, 0x6f, 0x72, 0x6c, 0x64], c);
+        assert_result!(
+            [
+                0xa1, 0x61, 0x43, 0xa1, 0x65, 0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x65, 0x77, 0x6f, 0x72,
+                0x6c, 0x64
+            ],
+            c
+        );
         assert_result!([0xa1, 0x61, 0x44, 0x84, 0x01, 0x02, 0x03, 0x04], d);
     }
 }
