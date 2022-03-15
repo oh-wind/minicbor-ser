@@ -100,6 +100,16 @@ mod lib {
     pub use std::collections::{btree_map, BTreeMap};
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct Config {
+    top_flatten: bool,
+}
+impl Default for Config {
+    fn default() -> Self {
+        Self { top_flatten: false }
+    }
+}
+
 pub use de::from_slice;
 pub use ser::to_vec;
 pub use ser::to_writer;

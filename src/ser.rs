@@ -5,16 +5,8 @@ use core::fmt::Display;
 use minicbor::{encode::Write, Encoder};
 use serde::serde_if_integer128;
 use serde::{self, ser};
+use super::Config;
 
-#[derive(Debug, Clone, Copy)]
-pub struct Config {
-    top_flatten: bool,
-}
-impl Default for Config {
-    fn default() -> Self {
-        Self { top_flatten: false }
-    }
-}
 
 pub struct Serializer<W> {
     pub(crate) encoder: Encoder<W>,
@@ -624,12 +616,13 @@ where
     Ok(out)
 }
 
-pub fn to_vec_flatten<T>(value: &T, flt: bool) -> Result<Vec<u8>, Error>
+#[inline]
+pub fn to_vec_flat<T>(value: &T) -> Result<Vec<u8>, Error>
 where
     T: ?Sized + ser::Serialize,
 {
     let mut out = Vec::with_capacity(128);
-    to_writer_cfg(value, &mut out, Config { top_flatten: flt })?;
+    to_writer_cfg(value, &mut out, Config { top_flatten: true })?;
     Ok(out)
 }
 
@@ -676,7 +669,9 @@ mod ser_tests {
 
     macro_rules! assert_result {
         ($expect:expr, $data:expr , $flt:expr) => {{
-            let __s: Vec<u8> = to_vec_flatten(&$data, $flt).unwrap();
+            let mut out = Vec::with_capacity(128);
+            to_writer_cfg(&$data, &mut out, Config { top_flatten: $flt }).unwrap();
+            let __s: Vec<u8> = out;
             let __s = __s.as_slice();
             assert_eq!(
                 $expect, __s,
