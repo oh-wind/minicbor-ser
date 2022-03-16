@@ -606,6 +606,10 @@ where
     }
 }
 
+/// Serialize a COBR to Vec.
+/// 
+/// Have to be aware of is, this function will map the top-level `Struct` and `Tuple` to a cbor `map` and `array`.
+/// If you want the top-level structure to be expanded, use the [`to_vec_flat`] function.
 #[inline]
 pub fn to_vec<T>(value: &T) -> Result<Vec<u8>, Error>
 where
@@ -616,6 +620,10 @@ where
     Ok(out)
 }
 
+/// Serialize a CBOR to Vec.
+/// 
+/// This function will serialize top-level `struct` and `tuple` in order. 
+/// So you should make sure their fields are in the same order.
 #[inline]
 pub fn to_vec_flat<T>(value: &T) -> Result<Vec<u8>, Error>
 where

@@ -113,6 +113,8 @@ impl Default for Config {
 pub use de::from_slice;
 pub use ser::to_vec;
 pub use ser::to_writer;
+pub use ser::to_vec_flat;
+pub use ser::to_writer_cfg;
 
 #[test]
 fn test_ser() {
