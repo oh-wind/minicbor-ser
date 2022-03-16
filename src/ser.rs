@@ -1,12 +1,11 @@
 #![allow(unused_variables, dead_code)]
+use super::Config;
 use crate::error::{Error, ErrorKind};
 use crate::lib::*;
 use core::fmt::Display;
 use minicbor::{encode::Write, Encoder};
 use serde::serde_if_integer128;
 use serde::{self, ser};
-use super::Config;
-
 
 pub struct Serializer<W> {
     pub(crate) encoder: Encoder<W>,
@@ -607,7 +606,7 @@ where
 }
 
 /// Serialize a COBR to Vec.
-/// 
+///
 /// Have to be aware of is, this function will map the top-level `Struct` and `Tuple` to a cbor `map` and `array`.
 /// If you want the top-level structure to be expanded, use the [`to_vec_flat`] function.
 #[inline]
@@ -621,8 +620,8 @@ where
 }
 
 /// Serialize a CBOR to Vec.
-/// 
-/// This function will serialize top-level `struct` and `tuple` in order. 
+///
+/// This function will serialize top-level `struct` and `tuple` in order.
 /// So you should make sure their fields are in the same order.
 #[inline]
 pub fn to_vec_flat<T>(value: &T) -> Result<Vec<u8>, Error>

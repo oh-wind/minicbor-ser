@@ -3,20 +3,31 @@
 use crate::error::type_mismatch;
 
 use super::error::{self, Error};
+use super::Config;
 use minicbor::data::Type;
 use serde::de::{self, Unexpected};
 
 pub struct Deserializer<'d> {
     decoder: minicbor::Decoder<'d>,
+    depth: u32,
+    flatten_top: bool,
 }
 
 impl<'de> Deserializer<'de> {
     pub fn new(data: &'de [u8]) -> Self {
         Deserializer {
             decoder: minicbor::Decoder::new(data),
+            depth: 0,
+            flatten_top: false,
         }
     }
-
+    pub fn new_with_config(data: &'de [u8], cfg: Config) -> Self {
+        Deserializer {
+            decoder: minicbor::Decoder::new(data),
+            depth: 0,
+            flatten_top: cfg.top_flatten,
+        }
+    }
     pub fn decoder(&mut self) -> &mut minicbor::Decoder<'de> {
         &mut self.decoder
     }
@@ -25,7 +36,22 @@ impl<'de> Deserializer<'de> {
     where
         V: de::Visitor<'de>,
     {
-        Err(type_mismatch(Type::Tag, "this type is not currently supported."))
+        Err(type_mismatch(
+            Type::Tag,
+            "this type is not currently supported.",
+        ))
+    }
+
+    /// internal API
+    #[doc(hidden)]
+    #[inline]
+    fn depth_add(&mut self, depth: i32) -> Result<(), error::Error> {
+        let m = self.depth as i32 + depth;
+        if m < 0 {
+            return Err(error::make_kind_err(error::ErrorKind::EndOfInput));
+        }
+        self.depth = m as u32;
+        Ok(())
     }
 }
 
@@ -239,9 +265,17 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         match self.decoder.datatype()? {
             Type::Array | Type::ArrayIndef => {
                 let len = self.decoder.array()?;
-                visitor.visit_seq(SeqAccess::new(self, len))
+                self.depth_add(1)?;
+                let v = visitor.visit_seq(SeqAccess::new(self, len));
+                self.depth_add(-1)?;
+                v
             }
-            _ => Err(type_mismatch(Type::Array, "expected array")),
+            _ => {
+                if self.flatten_top && self.depth == 0 {
+                    return visitor.visit_seq(SeqAccess::new(self, None));
+                }
+                Err(type_mismatch(Type::Array, "expected array"))
+            }
         }
     }
 
@@ -271,7 +305,10 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         match self.decoder.datatype()? {
             Type::Map | Type::MapIndef => {
                 let len = self.decoder.map()?;
-                visitor.visit_map(MapAccess::new(self, len))
+                self.depth_add(1)?;
+                let v = visitor.visit_map(MapAccess::new(self, len));
+                self.depth_add(-1)?;
+                v
             }
             _ => Err(type_mismatch(Type::Map, "expected map")),
         }
@@ -289,13 +326,24 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         match self.decoder.datatype()? {
             Type::Map | Type::MapIndef => {
                 let len = self.decoder.map()?;
-                visitor.visit_map(MapAccess::new(self, len))
+                self.depth_add(1)?;
+                let v = visitor.visit_map(MapAccess::new(self, len));
+                self.depth_add(-1)?;
+                v
             }
             Type::Array | Type::ArrayIndef => {
                 let len = self.decoder.array()?;
-                visitor.visit_seq(SeqAccess::new(self, len))
+                self.depth_add(1)?;
+                let v = visitor.visit_seq(SeqAccess::new(self, len));
+                self.depth_add(-1)?;
+                v
             }
-            e @ _ => Err(type_mismatch(e, "expected map or array")),
+            e @ _ => {
+                if self.flatten_top && self.depth == 0 {
+                    return visitor.visit_seq(SeqAccess::new(self, None));
+                }
+                Err(type_mismatch(e, "expected map or array"))
+            }
         }
     }
 
@@ -313,7 +361,9 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             Type::Map | Type::MapIndef => {
                 let len = self.decoder.map()?;
                 if len == Some(1) || len == None {
+                    self.depth_add(1)?;
                     let value = visitor.visit_enum(EnumVariantAccess::new(self))?;
+                    self.depth_add(-1)?;
                     if len == None && Type::Break != self.decoder.datatype()? {
                         return Err(type_mismatch(
                             Type::Break,
@@ -411,16 +461,16 @@ impl<'a, 'de> de::MapAccess<'de> for MapAccess<'a, 'de> {
                     Type::Break => Ok(None),
                     _ => {
                         let key = seed.deserialize(&mut *self.des)?;
-                        self.index += 1;
+                        // self.index += 1;
                         Ok(Some(key))
                     }
                 }
             }
-            Some(l) => {
-                if l == 0 {
+            Some(len) => {
+                if len == 0 {
                     return Ok(None);
                 }
-                if self.index > l {
+                if self.index > len {
                     return Ok(None);
                 }
                 let key = seed.deserialize(&mut *self.des)?;
@@ -568,6 +618,15 @@ where
     Ok(value)
 }
 
+pub fn from_slice_flat<'a, T>(data: &'a [u8]) -> Result<T, Error>
+where
+    T: de::Deserialize<'a>,
+{
+    let mut deserializer = Deserializer::new_with_config(data, Config { top_flatten: true });
+    let value = T::deserialize(&mut deserializer)?;
+    Ok(value)
+}
+
 #[cfg(test)]
 pub mod de_test {
 
@@ -577,6 +636,8 @@ pub mod de_test {
     #[cfg(not(feature = "std"))]
     use crate::lib::*;
 
+    use crate::lib::BTreeMap;
+
     #[test]
     fn test_seq() {
         let expect = [[2, 3, 0xff]];
@@ -585,13 +646,12 @@ pub mod de_test {
         let s = value[0].as_slice();
         assert_eq!(expect[0], s);
     }
-    
+
     #[test]
     fn test_tuple() {
         let expect = (0x01_u8, 0xff, "hello");
         let data = [0x01_u8, 0x18, 0xff, 0x65, 0x68, 0x65, 0x6C, 0x6C, 0x6F];
         let value: (u8, i32, String) = from_slice(&data).unwrap();
-        println!("{:?}", value);
     }
 
     #[derive(Debug, PartialEq, Deserialize, Serialize)]
@@ -601,6 +661,13 @@ pub mod de_test {
         c: u32,
         d: u64,
     }
+
+    #[derive(Debug, PartialEq, Deserialize, Serialize)]
+    struct TestStruct2 {
+        a: BTreeMap<i32, i32>,
+        b: u8,
+    }
+
     #[test]
     fn test_struct() {
         let expect = TestStruct {
@@ -629,6 +696,34 @@ pub mod de_test {
         ];
         let value: TestStruct = from_slice(&data).unwrap();
         assert_eq!(expect, value);
+
+        let exp = TestStruct2 {
+            a: {
+                let mut mp = BTreeMap::new();
+                mp.insert(1, 1);
+                mp.insert(0xff, 0xff);
+                mp
+            },
+            b: 0,
+        };
+
+        let data = [
+            0xA2, 0x61, 0x61, 0xA2, 0x01, 0x01, 0x18, 0xFF, 0x18, 0xFF, 0x61, 0x62, 0x00,
+        ];
+        let value: TestStruct2 = from_slice(&data).unwrap();
+        assert_eq!(exp, value);
+    }
+
+    #[test]
+    fn test_flat() {
+        let exp = (0x01u8, "a", 0xffi32);
+        let data = [0x01, 0x61, 0x61, 0x18, 0xFF];
+        let value = from_slice_flat(&data).unwrap();
+        assert_eq!(exp, value);
+
+        let data = crate::to_vec_flat(&exp).unwrap();
+        let value = from_slice_flat(&data).unwrap();
+        assert_eq!(exp, value);
     }
 
     macro_rules! test_enum {
