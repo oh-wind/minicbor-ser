@@ -1,5 +1,7 @@
 # minicbor-ser
 
+[![crev reviews](https://web.crev.dev/rust-reviews/badge/crev_count/minicbor-ser.svg)](https://web.crev.dev/rust-reviews/crate/minicbor-ser/)
+
 This repository provides a simple implementation of [serde] for [minicbor], making it easier to use.
 
 # Quick start
