@@ -651,7 +651,7 @@ pub mod de_test {
     fn test_tuple() {
         let expect = (0x01_u8, 0xff, "hello");
         let data = [0x01_u8, 0x18, 0xff, 0x65, 0x68, 0x65, 0x6C, 0x6C, 0x6F];
-        let value: (u8, i32, String) = from_slice(&data).unwrap();
+        let value: (u8, i32, String) = from_slice_flat(&data).unwrap();
     }
 
     #[derive(Debug, PartialEq, Deserialize, Serialize)]
