@@ -279,6 +279,7 @@ fn make_msg(msg: &'static str) -> &'static str {
     msg
 }
 
+use crate::lib::*;
 #[cfg(feature = "alloc")]
 #[inline]
 fn make_msg(msg: &str) -> String {

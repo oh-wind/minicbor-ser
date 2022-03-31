@@ -124,6 +124,7 @@ pub use ser::to_vec_flat;
 #[test]
 fn test_ser() {
     use serde::Serialize;
+    use self::lib::*;
     #[derive(Debug, Serialize)]
     struct TestStruct {
         hello: String,
@@ -143,6 +144,8 @@ fn test_ser() {
 #[test]
 fn test_de() {
     use serde::Deserialize;
+    use self::lib::*;
+
     #[derive(Debug, Deserialize, PartialEq)]
     struct TestStruct {
         hello: String,

@@ -328,7 +328,10 @@ where
         T: Display,
     {
         // Temporary:
-        self.serialize_str(&value.to_string())
+        #[cfg(feature = "alloc")]
+        { self.serialize_str(&value.to_string()) }
+        #[cfg(not(feature = "alloc"))]
+        { unreachable!() }
     }
 
     serde_if_integer128! {
