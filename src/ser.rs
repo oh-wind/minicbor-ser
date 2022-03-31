@@ -1,6 +1,7 @@
 #![allow(unused_variables, dead_code)]
 use super::Config;
-use crate::error::{Error, ErrorKind};
+pub use crate::error::en::Error;
+use crate::error::en::ErrorKind;
 use crate::lib::*;
 use core::fmt::Display;
 use minicbor::{encode::Write, Encoder};
@@ -39,7 +40,7 @@ where
 impl<'a, W> ser::Serializer for &'a mut Serializer<W>
 where
     W: Write,
-    W::Error: Display,
+    W::Error: Display + 'static,
 {
     type Ok = ();
     type Error = Error;
@@ -333,13 +334,13 @@ where
     serde_if_integer128! {
         #[inline]
         fn serialize_i128(self, v:i128) ->Result<Self::Ok,Self::Error> {
-            Err(super::error::make_kind_err(ErrorKind::Unsupported128BitInteger))
+            Err(super::error::en::make_kind_err(ErrorKind::Unsupported128BitInteger, "128-bit integers are not currently supported."))
         }
     }
     serde_if_integer128! {
         #[inline]
         fn serialize_u128(self, v:u128) ->Result<Self::Ok,Self::Error> {
-            Err(super::error::make_kind_err(ErrorKind::Unsupported128BitInteger))
+            Err(super::error::en::make_kind_err(ErrorKind::Unsupported128BitInteger, "128-bit integers are not currently supported."))
         }
     }
 }
@@ -367,7 +368,7 @@ pub enum Compound<'a, W: 'a> {
 impl<'a, W> ser::SerializeSeq for Compound<'a, W>
 where
     W: Write,
-    W::Error: Display,
+    W::Error: Display  + 'static,
 {
     type Ok = ();
     type Error = Error;
@@ -422,7 +423,7 @@ where
 impl<'a, W> ser::SerializeStruct for Compound<'a, W>
 where
     W: Write,
-    W::Error: Display,
+    W::Error: Display  + 'static ,
 {
     type Ok = ();
     type Error = Error;
@@ -450,7 +451,7 @@ where
 impl<'a, W> ser::SerializeTuple for Compound<'a, W>
 where
     W: Write,
-    W::Error: Display,
+    W::Error: Display  + 'static ,
 {
     type Ok = ();
     type Error = Error;
@@ -470,7 +471,7 @@ where
 impl<'a, W> ser::SerializeTupleStruct for Compound<'a, W>
 where
     W: Write,
-    W::Error: Display,
+    W::Error: Display  + 'static ,
 {
     type Ok = ();
     type Error = Error;
@@ -490,7 +491,7 @@ where
 impl<'a, W> ser::SerializeTupleVariant for Compound<'a, W>
 where
     W: Write,
-    W::Error: Display,
+    W::Error: Display  + 'static ,
 {
     type Ok = ();
     type Error = Error;
@@ -510,7 +511,7 @@ where
 impl<'a, W> ser::SerializeMap for Compound<'a, W>
 where
     W: Write,
-    W::Error: Display,
+    W::Error: Display  + 'static ,
 {
     type Ok = ();
     type Error = Error;
@@ -582,7 +583,7 @@ where
 impl<'a, W> ser::SerializeStructVariant for Compound<'a, W>
 where
     W: Write,
-    W::Error: Display,
+    W::Error: Display  + 'static ,
 {
     type Ok = ();
     type Error = Error;
@@ -605,11 +606,12 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
+#[inline]
 /// Serialize a COBR to Vec.
 ///
 /// Have to be aware of is, this function will map the top-level `Struct` and `Tuple` to a cbor `map` and `array`.
 /// If you want the top-level structure to be expanded, use the [`to_vec_flat`] function.
-#[inline]
 pub fn to_vec<T>(value: &T) -> Result<Vec<u8>, Error>
 where
     T: ?Sized + ser::Serialize,
@@ -619,11 +621,12 @@ where
     Ok(out)
 }
 
+#[cfg(feature = "alloc")]
+#[inline]
 /// Serialize a CBOR to Vec.
 ///
 /// This function will serialize top-level `struct` and `tuple` in order.
 /// So you should make sure their fields are in the same order.
-#[inline]
 pub fn to_vec_flat<T>(value: &T) -> Result<Vec<u8>, Error>
 where
     T: ?Sized + ser::Serialize,
@@ -637,7 +640,7 @@ where
 pub fn to_writer_cfg<W, T>(value: &T, writer: W, cfg: Config) -> Result<(), Error>
 where
     W: Write,
-    W::Error: Display,
+    W::Error: Display  + 'static,
     T: ?Sized + ser::Serialize,
 {
     let mut se = Serializer::new_with_config(writer, cfg);
@@ -649,7 +652,7 @@ where
 pub fn to_writer<W, T>(value: &T, writer: W) -> Result<(), Error>
 where
     W: Write,
-    W::Error: Display,
+    W::Error: Display + 'static,
     T: ?Sized + ser::Serialize,
 {
     let mut se = Serializer::new(writer);
@@ -658,16 +661,17 @@ where
 }
 
 #[inline]
-pub fn by_encoder<T: minicbor::Encode, W>(v: T, serializer: &mut Serializer<W>) -> Result<(), Error>
+pub fn by_encoder<T, W>(v: T, serializer: &mut Serializer<W>) -> Result<(), Error>
 where
+    T: minicbor::Encode,
     W: Write,
-    W::Error: Display,
+    W::Error: Display + 'static,
 {
     serializer.encoder().encode(v)?;
     Ok(())
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "alloc"))]
 mod ser_tests {
 
     use serde::Serialize;

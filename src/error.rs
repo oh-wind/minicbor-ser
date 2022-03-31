@@ -1,131 +1,288 @@
-use crate::lib::*;
-use core::fmt::{self, Debug, Display, Formatter};
-use minicbor;
-use minicbor::data::Type;
+#![allow(unused)]
 
-use ser::StdError;
+pub(crate) mod en{
 
-use serde::{de, ser};
-pub type Result<T> = core::result::Result<T, Error>;
 
-#[derive(Debug, Clone)]
-pub struct Error {
-    err: Box<ErrorKind>,
-}
+    use crate::lib::*;
+    use minicbor;
+    use serde::ser;
+    use super::make_msg;
 
-#[derive(Debug, Clone)]
-pub enum ErrorKind {
-    Write(Box<str>),
-    Message(Box<str>),
-    /// Decoding has (unexpectedly) reached the end of the input slice.
-    EndOfInput,
-    /// Data item to decode is not a valid `char`.
-    InvalidChar(u32),
-    /// Decoding a string failed because it is invalid UTF-8.
-    Utf8(str::Utf8Error),
-    /// A numeric value exceeds its value range.
-    Overflow(u64, Box<str>),
-    /// An unexpected type was encountered.
-    TypeMismatch(Type, Box<str>),
-    /// An unknown enum variant was encountered.
-    UnknownVariant(u32),
-    /// A value was missing at the specified index.
-    MissingValue(u32, Box<str>),
-    /// 128-bit integers are not supported at this time
-    Unsupported128BitInteger,
-}
 
-impl Display for Error {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match &*self.err {
-            ErrorKind::Write(w) => write!(f, "write error: {}", w),
-            ErrorKind::EndOfInput => f.write_str("end of input bytes"),
-            ErrorKind::InvalidChar(n) => write!(f, "invalid char: {:#x?}", n),
-            ErrorKind::Utf8(e) => write!(f, "invalid utf-8: {}", e),
-            ErrorKind::Overflow(n, m) => write!(f, "{}: {} overflows target type", m, n),
-            ErrorKind::TypeMismatch(t, m) => write!(f, "unexpected type: {}, {}", t, m),
-            ErrorKind::UnknownVariant(n) => write!(f, "unknown enum variant {}", n),
-            ErrorKind::MissingValue(n, s) => write!(f, "missing value at index {} for {}", n, s),
-            ErrorKind::Message(m) => f.write_str(m),
-            _ => f.write_str("unknow"),
+    pub struct Error{
+        #[cfg(feature = "alloc")]
+        source: Option<Box<dyn Display>>,
+
+        kind: ErrorKind,
+        #[cfg(not(feature = "alloc"))]
+        msg: &'static str,
+        #[cfg(feature = "alloc")]
+        msg: String,
+    }
+
+    impl Debug for Error{
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "Error {{ ")?;
+            #[cfg(feature = "alloc")]
+            {
+                write!(f, "source: ")?;
+                if let Some(s) = self.source.as_ref(){
+                    s.as_ref().fmt(f)
+                }else{
+                    write!(f, "None")
+                }
+            }?;
+            write!(f, " kind: {}, msg: {} }}", self.kind, self.msg)
         }
     }
-}
 
-impl StdError for Error {
+    #[derive(Debug, Clone)]
+    pub(crate) enum ErrorKind {
+        Write,
+        Message,
+        Custom,
+        Unknow,
+        Unsupported128BitInteger,
+    }
+    impl Display for ErrorKind {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            match self {
+                ErrorKind::Write => write!(f, "Write"),
+                ErrorKind::Message => write!(f, "Message"),
+                ErrorKind::Custom => write!(f, "Custom"),
+                ErrorKind::Unknow => write!(f, "Unknow"),
+                ErrorKind::Unsupported128BitInteger => write!(f, "Unsupported128BitIntege"),
+            }    
+        }
+    }
+
+    impl  Display for Error
+    {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> fmt::Result {
+            #[cfg(feature = "alloc")]
+            {
+                if let Some(e) = self.source.as_ref() {
+                    fmt::Display::fmt(e, f)
+                } else {
+                    write!(f, "error type: {}, error msg: {}", self.kind, self.msg)
+                }
+            }
+            #[cfg(not(feature = "alloc"))]
+            {
+                write!(f, "error type: {}, error msg: {}", self.kind, self.msg)
+            }
+        }
+    }
+
     #[cfg(feature = "std")]
-    fn source(&self) -> Option<&(dyn StdError + 'static)> {
-        match &*self.err {
-            ErrorKind::Utf8(e) => Some(e),
-            _ => None,
-        }
-    }
-}
-
-impl ser::Error for Error {
-    fn custom<T>(msg: T) -> Self
-    where
-        T: Display,
+    impl  ser::StdError for Error
     {
-        make_msg_err(msg)
+        fn source(&self) -> Option<&(dyn ser::StdError + 'static)> {
+            None
+        }
     }
-}
 
-impl de::Error for Error {
-    fn custom<T>(msg: T) -> Self
-    where
-        T: Display,
+
+    impl  ser::Error for Error
     {
-        make_msg_err(msg)
+        fn custom<T>(msg: T) -> Self
+        where
+            T: Display,
+        {
+            Error {
+                #[cfg(feature = "alloc")]
+                source: None,
+                kind: ErrorKind::Custom,
+                
+                #[cfg(feature = "alloc")]
+                msg : msg.to_string(),
+                #[cfg(not(feature = "alloc"))]
+                msg : "",
+            }
+            
+        }
     }
-}
 
-fn make_msg_err<T: Display>(msg: T) -> Error {
-    Error {
-        err: Box::new(ErrorKind::Message(msg.to_string().into_boxed_str())),
+    impl<E> From<minicbor::encode::Error<E>> for Error
+    where 
+        E: Display + 'static
+    {
+        fn from(e: minicbor::encode::Error<E>) -> Self {
+            let kind = if e.is_message() {
+                ErrorKind::Message
+            }else {
+                ErrorKind::Write
+            };
+            Error {
+                #[cfg(feature = "alloc")]
+                source : Some(Box::new(e)),
+                kind,
+                msg: make_msg("")
+            }
+        }
     }
-}
 
-impl<T: Display> From<minicbor::encode::Error<T>> for Error {
-    fn from(e: minicbor::encode::Error<T>) -> Self {
-        match e {
-            minicbor::encode::Error::Write(ref w) => make_msg_err(w),
-            minicbor::encode::Error::Message(ref m) => make_msg_err(m),
-            _ => panic!(),
+    pub(crate) fn make_kind_err (e: ErrorKind, msg: &'static str) -> Error {
+        Error { 
+            #[cfg(feature = "alloc")]
+            source: None, 
+            kind: e, 
+            msg: make_msg(msg) 
         }
     }
 }
 
-impl From<minicbor::decode::Error> for Error {
-    fn from(e: minicbor::decode::Error) -> Self {
-        match e {
-            minicbor::decode::Error::EndOfInput => make_kind_err(ErrorKind::EndOfInput),
-            minicbor::decode::Error::InvalidChar(n) => make_kind_err(ErrorKind::InvalidChar(n)),
-            minicbor::decode::Error::Utf8(e) => make_kind_err(ErrorKind::Utf8(e)),
-            minicbor::decode::Error::Overflow(n, s) => {
-                make_kind_err(ErrorKind::Overflow(n, s.to_string().into_boxed_str()))
+
+pub(crate) mod de{
+    use crate::lib::*;
+    use core::fmt::{self, Debug, Display, Formatter};
+    use minicbor;
+    use minicbor::data::Type;
+
+    use serde::{de};
+    use super::make_msg;
+
+    #[derive(Debug)]
+    pub struct Error {
+        source: Option<minicbor::decode::Error>,
+        kind: ErrorKind,
+        #[cfg(not(feature = "alloc"))]
+        msg: &'static str,
+        #[cfg(feature = "alloc")]
+        msg: String,
+    }
+
+    #[cfg(feature = "std")]
+    impl de::StdError for Error{
+        fn source(&self) -> Option<&(dyn de::StdError + 'static)> {
+            if let Some(e) = self.source.as_ref(){
+                Some(e)
+            }else{
+                None
             }
-            minicbor::decode::Error::TypeMismatch(t, s) => {
-                make_kind_err(ErrorKind::TypeMismatch(t, s.to_string().into_boxed_str()))
-            }
-            minicbor::decode::Error::UnknownVariant(v) => {
-                make_kind_err(ErrorKind::UnknownVariant(v))
-            }
-            minicbor::decode::Error::MissingValue(m, s) => {
-                make_kind_err(ErrorKind::MissingValue(m, s.to_string().into_boxed_str()))
-            }
-            minicbor::decode::Error::Message(m) => {
-                make_kind_err(ErrorKind::Message(m.to_string().into_boxed_str()))
-            }
-            _ => make_msg_err("unknow error"),
         }
     }
+
+    #[derive(Debug, Clone)]
+    pub enum ErrorKind {
+        Message,
+        /// Decoding has (unexpectedly) reached the end of the input slice.
+        EndOfInput,
+        /// Data item to decode is not a valid `char`.
+        InvalidChar,
+        TypeMismatch(Option<Type>),
+        /// An unknown enum variant was encountered.
+        UnknownVariant,
+        /// A value was missing at the specified index.
+        MissingValue,
+        /// 128-bit integers are not supported at this time
+        Unsupported128BitInteger,
+        
+        Custom,
+        Unknow,
+    }
+
+    impl fmt::Display for ErrorKind {
+        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+            match self {
+                ErrorKind::Message => write!(f, "Message") ,
+                ErrorKind::EndOfInput =>write!(f, "EndOfInput") ,
+                ErrorKind::InvalidChar =>write!(f, "InvalidChar") ,
+                ErrorKind::TypeMismatch(t) => {
+                    if let Some(ty) = t.as_ref() {
+                        write!(f, "TypeMismatch{{ {} }}", ty)
+                    }else{
+                        write!(f, "TypeMismatch")
+                    }
+                },
+                ErrorKind::UnknownVariant =>write!(f, "UnknownVariant") ,
+                ErrorKind::MissingValue =>write!(f, "MissingValue") ,
+                ErrorKind::Unsupported128BitInteger =>write!(f, "Unsupported128BitInteger") ,
+                ErrorKind::Custom => write!(f, "Custom"),
+                ErrorKind::Unknow => write!(f, "Unknow"),
+            }
+        }
+    }
+
+    impl  Display for Error 
+    {
+        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+            if let Some(e) = self.source.as_ref() {
+                core::fmt::Display::fmt(&e, f)
+            } else {
+                write!(f, "error kind: {}, msg: {}", self.kind, self.msg)
+            }
+        }
+    }
+
+
+
+
+    impl  de::Error for Error {
+        fn custom<T>(msg: T) -> Self
+        where
+            T: Display,
+        {
+            make_custom_err(msg)
+        }
+    }
+
+    #[inline]
+    fn make_custom_err<T: Display>(msg: T) -> Error {
+        Error {
+            source: None,
+            kind: ErrorKind::Custom,
+            
+            #[cfg(feature = "alloc")]
+            msg : msg.to_string(),
+            #[cfg(not(feature = "alloc"))]
+            msg : "",
+        }
+    }
+
+    impl  From<minicbor::decode::Error> for Error
+    {
+        fn from(e: minicbor::decode::Error) -> Self {
+            let kind = if e.is_end_of_input() {
+                ErrorKind::EndOfInput
+            }else if e.is_message() {
+                ErrorKind::Message
+            }else if e.is_type_mismatch() {
+                // never reach
+                ErrorKind::TypeMismatch(None)
+            }else if e.is_unknown_variant(){
+                ErrorKind::UnknownVariant
+            }else if e.is_missing_value(){
+                ErrorKind::MissingValue
+            }else{
+                // #[cfg(feature = "std")]
+                // if e.is_custom() {
+                //     ErrorKind::Custom
+                // }
+                ErrorKind::Unknow
+            };
+            Error { source: Some(e), kind, msg: make_msg("") }
+        }
+    }
+    #[inline]
+    pub(crate) fn make_kind_err(e: ErrorKind, msg: &'static str) -> Error {
+        Error { source: None, kind: e, msg: make_msg(msg) }
+    }
+    #[inline]
+    pub(crate) fn type_mismatch(t: Type, s: &'static str) -> Error {
+        Error { source: None, kind: ErrorKind::TypeMismatch(Some(t)), msg: make_msg(s) }
+    }
+
 }
+
+#[cfg(not(feature = "alloc"))]
 #[inline]
-pub(crate) fn make_kind_err(e: ErrorKind) -> Error {
-    Error { err: Box::new(e) }
+fn make_msg( msg: &'static str) -> &'static str{
+    msg
 }
+
+#[cfg(feature = "alloc")]
 #[inline]
-pub(crate) fn type_mismatch(t: Type, s: &str) -> Error {
-    make_kind_err(ErrorKind::TypeMismatch(t, s.to_string().into_boxed_str()))
+fn make_msg( msg: &str) -> String{
+    msg.into()
 }

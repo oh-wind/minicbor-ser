@@ -1,8 +1,8 @@
 #![allow(unused_variables)]
 
-use crate::error::type_mismatch;
+use crate::error::de::type_mismatch;
 
-use super::error::{self, Error};
+use super::error::de::{self as error, Error};
 use super::Config;
 use minicbor::data::Type;
 use serde::de::{self, Unexpected};
@@ -48,7 +48,7 @@ impl<'de> Deserializer<'de> {
     fn depth_add(&mut self, depth: i32) -> Result<(), error::Error> {
         let m = self.depth as i32 + depth;
         if m < 0 {
-            return Err(error::make_kind_err(error::ErrorKind::EndOfInput));
+            return Err(error::make_kind_err(error::ErrorKind::EndOfInput, "End of input."));
         }
         self.depth = m as u32;
         Ok(())
@@ -98,6 +98,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 Type::Unknown(u),
                 "rust doesn't support this type",
             )),
+            Type::Int => todo!(),
         }
     }
 
@@ -627,6 +628,7 @@ where
     Ok(value)
 }
 
+#[cfg(feature = "alloc")]
 #[cfg(test)]
 pub mod de_test {
 

@@ -17,14 +17,15 @@ features = ["std"]
 serde = {version = "1.0.*", default-features = false}
 
 [dependencies.minicbor]
-version = "~0.11"
+version = "~0.15"
 features = ["alloc"]
 
 [dev-dependencies]
-serde = {version = "1.0.*", features = ["derive"]}
+serde = {version = "1.0.*", default-features = false, features = ["derive"]}
 
 
 
 [features]
-std = ["serde/std", "minicbor/std", "minicbor/alloc"]
-default = ["std"]
+std = ["serde/std", "minicbor/std", "alloc"]
+alloc = [ "serde/alloc" ,"minicbor/alloc" ]
+default = [ "std" ]
