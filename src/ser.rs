@@ -368,7 +368,7 @@ pub enum Compound<'a, W: 'a> {
 impl<'a, W> ser::SerializeSeq for Compound<'a, W>
 where
     W: Write,
-    W::Error: Display  + 'static,
+    W::Error: Display + 'static,
 {
     type Ok = ();
     type Error = Error;
@@ -423,7 +423,7 @@ where
 impl<'a, W> ser::SerializeStruct for Compound<'a, W>
 where
     W: Write,
-    W::Error: Display  + 'static ,
+    W::Error: Display + 'static,
 {
     type Ok = ();
     type Error = Error;
@@ -451,7 +451,7 @@ where
 impl<'a, W> ser::SerializeTuple for Compound<'a, W>
 where
     W: Write,
-    W::Error: Display  + 'static ,
+    W::Error: Display + 'static,
 {
     type Ok = ();
     type Error = Error;
@@ -471,7 +471,7 @@ where
 impl<'a, W> ser::SerializeTupleStruct for Compound<'a, W>
 where
     W: Write,
-    W::Error: Display  + 'static ,
+    W::Error: Display + 'static,
 {
     type Ok = ();
     type Error = Error;
@@ -491,7 +491,7 @@ where
 impl<'a, W> ser::SerializeTupleVariant for Compound<'a, W>
 where
     W: Write,
-    W::Error: Display  + 'static ,
+    W::Error: Display + 'static,
 {
     type Ok = ();
     type Error = Error;
@@ -511,7 +511,7 @@ where
 impl<'a, W> ser::SerializeMap for Compound<'a, W>
 where
     W: Write,
-    W::Error: Display  + 'static ,
+    W::Error: Display + 'static,
 {
     type Ok = ();
     type Error = Error;
@@ -583,7 +583,7 @@ where
 impl<'a, W> ser::SerializeStructVariant for Compound<'a, W>
 where
     W: Write,
-    W::Error: Display  + 'static ,
+    W::Error: Display + 'static,
 {
     type Ok = ();
     type Error = Error;
@@ -640,7 +640,7 @@ where
 pub fn to_writer_cfg<W, T>(value: &T, writer: W, cfg: Config) -> Result<(), Error>
 where
     W: Write,
-    W::Error: Display  + 'static,
+    W::Error: Display + 'static,
     T: ?Sized + ser::Serialize,
 {
     let mut se = Serializer::new_with_config(writer, cfg);

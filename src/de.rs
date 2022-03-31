@@ -48,7 +48,10 @@ impl<'de> Deserializer<'de> {
     fn depth_add(&mut self, depth: i32) -> Result<(), error::Error> {
         let m = self.depth as i32 + depth;
         if m < 0 {
-            return Err(error::make_kind_err(error::ErrorKind::EndOfInput, "End of input."));
+            return Err(error::make_kind_err(
+                error::ErrorKind::EndOfInput,
+                "End of input.",
+            ));
         }
         self.depth = m as u32;
         Ok(())

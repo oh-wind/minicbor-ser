@@ -51,9 +51,8 @@
 //!
 //! ```
 
-#[cfg(all(feature = "alloc", not(feature= "std" )))]
+#[cfg(all(feature = "alloc", not(feature = "std")))]
 extern crate alloc;
-
 
 pub mod de;
 pub(crate) mod error;
@@ -69,7 +68,6 @@ mod lib {
         pub use std::*;
     }
 
-
     pub use self::core::cell::{Cell, RefCell};
     pub use self::core::clone::{self, Clone};
     pub use self::core::convert::{self, From, Into};
@@ -82,23 +80,22 @@ mod lib {
     pub use self::core::result::{self, Result};
     pub use self::core::{borrow, char, cmp, iter, mem, num, ops, slice, str};
 
-
-    #[cfg(all(feature = "alloc", not(feature= "std" )))]
+    #[cfg(all(feature = "alloc", not(feature = "std")))]
     pub use alloc::string::{String, ToString};
     #[cfg(feature = "std")]
     pub use std::string::{String, ToString};
 
-    #[cfg(all(feature = "alloc", not(feature= "std" )))]
+    #[cfg(all(feature = "alloc", not(feature = "std")))]
     pub use alloc::vec::{self, Vec};
     #[cfg(feature = "std")]
     pub use std::vec::{self, Vec};
 
-    #[cfg(all(feature = "alloc", not(feature= "std" )))]
+    #[cfg(all(feature = "alloc", not(feature = "std")))]
     pub use alloc::boxed::Box;
     #[cfg(feature = "std")]
     pub use std::boxed::Box;
 
-    #[cfg(all(feature = "alloc", not(feature= "std" )))]
+    #[cfg(all(feature = "alloc", not(feature = "std")))]
     pub use alloc::collections::{btree_map, BTreeMap};
     #[cfg(feature = "std")]
     pub use std::collections::{btree_map, BTreeMap};
