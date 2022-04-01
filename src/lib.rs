@@ -9,44 +9,41 @@
 //!
 //! ```rust
 //! use serde::Serialize;
-//! fn main(){
-//!     #[derive(Debug, Serialize)]
-//!     struct TestStruct {
-//!         hello: String,
-//!     }
-//!
-//!     let test_struct = TestStruct {
-//!             hello: "world".to_string(),
-//!     };
-//!
-//!     let value = to_vec(&test_struct).unwrap();
-//!     assert_eq!(
-//!         [0xA1u8, 0x65, 0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x65, 0x77, 0x6F, 0x72, 0x6C, 0x64],
-//!         value.as_slice(),
-//!     )
+//! #[derive(Debug, Serialize)]
+//! struct TestStruct {
+//!    hello: String,
 //! }
+//!
+//! let test_struct = TestStruct {
+//!         hello: "world".to_string(),
+//! };
+//!
+//! let value = to_vec(&test_struct).unwrap();
+//! assert_eq!(
+//!     [0xA1u8, 0x65, 0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x65, 0x77, 0x6F, 0x72, 0x6C, 0x64],
+//!     value.as_slice(),
+//! )
 //! ```
 //!
 //! * Deserialization
 //!
 //! ```rust
 //! use serde::Deserialize;
-//! fn main(){
-//!     #[derive(Debug, Deserialize, PartialEq)]
-//!     struct TestStruct {
-//!         hello: String,
-//!     }
+//! #[derive(Debug, Deserialize, PartialEq)]
+//! struct TestStruct {
+//!     hello: String,
+//! }
 //!
-//!     let data = [0xA1u8, 0x65, 0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x65, 0x77, 0x6F, 0x72, 0x6C, 0x64];
+//! let data = [0xA1u8, 0x65, 0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x65, 0x77, 0x6F, 0x72, 0x6C, 0x64];
 //!
-//!     let value: TestStruct = from_slice(&data[..]).unwrap();
+//! let value: TestStruct = from_slice(&data[..]).unwrap();
 //!
-//!     assert_eq!(
-//!         TestStruct {
-//!             hello: "world".to_string(),
-//!         },
-//!         value,
-//!     );
+//! assert_eq!(
+//!     TestStruct {
+//!         hello: "world".to_string(),
+//!     },
+//!     value,
+//! );
 //! }
 //!
 //! ```
@@ -101,14 +98,9 @@ mod lib {
     pub use std::collections::{btree_map, BTreeMap};
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Config {
     top_flatten: bool,
-}
-impl Default for Config {
-    fn default() -> Self {
-        Self { top_flatten: false }
-    }
 }
 
 pub use de::from_slice;

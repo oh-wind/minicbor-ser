@@ -4,7 +4,7 @@ pub(crate) mod en {
 
     use super::make_msg;
     use crate::lib::*;
-    use minicbor;
+    
     use serde::ser;
 
     pub struct Error {
@@ -128,7 +128,7 @@ pub(crate) mod en {
 pub(crate) mod de {
     use crate::lib::*;
     use core::fmt::{self, Debug, Display, Formatter};
-    use minicbor;
+    
     use minicbor::data::Type;
 
     use super::make_msg;

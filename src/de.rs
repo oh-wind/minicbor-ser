@@ -342,7 +342,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 self.depth_add(-1)?;
                 v
             }
-            e @ _ => {
+            e => {
                 if self.flatten_top && self.depth == 0 {
                     return visitor.visit_seq(SeqAccess::new(self, None));
                 }
@@ -374,12 +374,12 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                             "expected map with 1 element, but break code(0xff) was not found",
                         ));
                     }
-                    return Ok(value);
+                    Ok(value)
                 } else {
-                    return Err(type_mismatch(Type::Map, "expected map with 1 element"));
+                    Err(type_mismatch(Type::Map, "expected map with 1 element"))
                 }
             }
-            t @ _ => Err(type_mismatch(t, "expected map or string")),
+            t => Err(type_mismatch(t, "expected map or string")),
         }
     }
 
