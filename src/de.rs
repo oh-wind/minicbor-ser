@@ -274,11 +274,11 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 self.depth_add(-1)?;
                 v
             }
-            _ => {
+            e => {
                 if self.flatten_top && self.depth == 0 {
                     return visitor.visit_seq(SeqAccess::new(self, None));
                 }
-                Err(type_mismatch(Type::Array, "expected array"))
+                Err(type_mismatch(e, "expected array"))
             }
         }
     }
@@ -314,7 +314,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 self.depth_add(-1)?;
                 v
             }
-            _ => Err(type_mismatch(Type::Map, "expected map")),
+            e=> Err(type_mismatch(e, "expected map")),
         }
     }
 
