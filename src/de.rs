@@ -11,6 +11,7 @@ pub struct Deserializer<'d> {
     decoder: minicbor::Decoder<'d>,
     depth: u32,
     flatten_top: bool,
+    vec_bytes: Option<u8>
 }
 
 impl<'de> Deserializer<'de> {
@@ -19,6 +20,7 @@ impl<'de> Deserializer<'de> {
             decoder: minicbor::Decoder::new(data),
             depth: 0,
             flatten_top: false,
+            vec_bytes:None,
         }
     }
     pub fn new_with_config(data: &'de [u8], cfg: Config) -> Self {
@@ -26,6 +28,7 @@ impl<'de> Deserializer<'de> {
             decoder: minicbor::Decoder::new(data),
             depth: 0,
             flatten_top: cfg.top_flatten,
+            vec_bytes: None,
         }
     }
     pub fn decoder(&mut self) -> &mut minicbor::Decoder<'de> {
@@ -144,7 +147,11 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: de::Visitor<'de>,
     {
-        visitor.visit_u8(self.decoder.u8()?)
+        if let Some(bs) = self.vec_bytes{
+            return visitor.visit_u8(bs)
+        }else {
+            visitor.visit_u8(self.decoder.u8()?)
+        }
     }
 
     fn deserialize_u16<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -273,7 +280,11 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 let v = visitor.visit_seq(SeqAccess::new(self, len));
                 self.depth_add(-1)?;
                 v
-            }
+            },
+            Type::Bytes => {
+                let bytes = self.decoder.bytes()?;
+                visitor.visit_seq(SeqAccess::new_with_bytes(self, bytes))
+            },
             e => {
                 if self.flatten_top && self.depth == 0 {
                     return visitor.visit_seq(SeqAccess::new(self, None));
@@ -402,11 +413,15 @@ struct SeqAccess<'a, 'de: 'a> {
     des: &'a mut Deserializer<'de>,
     len: Option<u64>,
     index: u64,
+    bytes: Option<&'a [u8]>
 }
 
 impl<'a, 'de> SeqAccess<'a, 'de> {
     fn new(des: &'a mut Deserializer<'de>, len: Option<u64>) -> Self {
-        SeqAccess { des, len, index: 0 }
+        SeqAccess { des, len,  index: 0, bytes: None }
+    }
+    fn new_with_bytes(des: &'a mut Deserializer<'de>, bytes: &'a [u8]) -> Self{
+        SeqAccess { des, len: Some(bytes.len() as u64), index: 0, bytes: Some(bytes) }
     }
 }
 
@@ -417,7 +432,15 @@ impl<'de, 'a> de::SeqAccess<'de> for SeqAccess<'a, 'de> {
     where
         T: de::DeserializeSeed<'de>,
     {
+        if let Some(bytes) = self.bytes{
+            if self.index >= self.len.unwrap(){
+                return Ok(None)
+            }
+            self.des.vec_bytes = Some(bytes[self.index as usize])
+        }
+
         self.index += 1;
+
         match self.len {
             None => {
                 let decoder = self.des.decoder();
@@ -431,6 +454,7 @@ impl<'de, 'a> de::SeqAccess<'de> for SeqAccess<'a, 'de> {
                     return Ok(None);
                 }
                 if self.index > len {
+                    self.des.vec_bytes = None;
                     return Ok(None);
                 }
                 Ok(Some(seed.deserialize(&mut *self.des)?))
@@ -438,6 +462,7 @@ impl<'de, 'a> de::SeqAccess<'de> for SeqAccess<'a, 'de> {
         }
     }
 }
+
 
 struct MapAccess<'a, 'de: 'a> {
     des: &'a mut Deserializer<'de>,
@@ -650,6 +675,12 @@ pub mod de_test {
         let value: Vec<Vec<u8>> = from_slice(&data).unwrap();
         let s = value[0].as_slice();
         assert_eq!(expect[0], s);
+
+        let expect = "hello".to_string();
+        let data = [0x45u8, 0x68, 0x65, 0x6C, 0x6C, 0x6F];
+        let value: Vec<u8> = from_slice(&data).unwrap();
+        let hello = String::from_utf8(value).unwrap();
+        assert_eq!(expect, hello);
     }
 
     #[test]
