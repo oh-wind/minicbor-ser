@@ -97,6 +97,7 @@ The following represents how the minicbor-ser will map the types of Rust and CBO
 |      &[u8]       |               bytes               |
 |      tuple       | array (if `flatten_top` is false) |
 |       Vec        | array (if `flatten_top` is false) |
+|     Vec<u8>      |               Bytes               |
 | newtype variant  |                map                |
 |   unit variant   |              String               |
 |  tuple variant   |               array               |
