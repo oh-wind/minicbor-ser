@@ -51,7 +51,7 @@
 extern crate alloc;
 
 pub mod de;
-pub(crate) mod error;
+pub mod error;
 pub mod ser;
 pub use minicbor as cbor;
 

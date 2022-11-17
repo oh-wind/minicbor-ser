@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-pub(crate) mod en {
+pub mod en {
 
     use super::make_msg;
     use crate::lib::*;
@@ -11,7 +11,7 @@ pub(crate) mod en {
         #[cfg(feature = "alloc")]
         source: Option<Box<dyn Display>>,
 
-        kind: ErrorKind,
+        pub kind: ErrorKind,
         #[cfg(not(feature = "alloc"))]
         msg: &'static str,
         #[cfg(feature = "alloc")]
@@ -35,7 +35,7 @@ pub(crate) mod en {
     }
 
     #[derive(Debug, Clone)]
-    pub(crate) enum ErrorKind {
+    pub enum ErrorKind {
         Write,
         Message,
         Custom,
@@ -125,7 +125,7 @@ pub(crate) mod en {
     }
 }
 
-pub(crate) mod de {
+pub mod de {
     use crate::lib::*;
     use core::fmt::{self, Debug, Display, Formatter};
     
@@ -137,7 +137,7 @@ pub(crate) mod de {
     #[derive(Debug)]
     pub struct Error {
         source: Option<minicbor::decode::Error>,
-        kind: ErrorKind,
+        pub kind: ErrorKind,
         #[cfg(not(feature = "alloc"))]
         msg: &'static str,
         #[cfg(feature = "alloc")]
