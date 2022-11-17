@@ -666,7 +666,7 @@ where
 #[inline]
 pub fn by_encoder<T, W>(v: T, serializer: &mut Serializer<W>) -> Result<(), Error>
 where
-    T: minicbor::Encode,
+    T: minicbor::Encode<()>,
     W: Write,
     W::Error: Display + 'static,
 {
