@@ -1,3 +1,5 @@
+# The project is no longer actively maintained
+
 # minicbor-ser
 
 [![crev reviews](https://web.crev.dev/rust-reviews/badge/crev_count/minicbor-ser.svg)](https://web.crev.dev/rust-reviews/crate/minicbor-ser/)
